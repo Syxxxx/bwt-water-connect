@@ -1,0 +1,22 @@
+
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Adoucisseur d'eau BWT",
+        "description": "Entrez vos identifiants BWT",
+        "data": {
+          "username": "Nom d'utilisateur",
+          "password": "Mot de passe"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Authentification invalide",
+      "unknown": "Erreur inattendue"
+    },
+    "abort": {
+      "already_configured": "Appareil déjà configuré"
+    }
+  }
+}

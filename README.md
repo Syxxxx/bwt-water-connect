@@ -1,69 +1,48 @@
-# Welcome to your Lovable project
 
-## Project info
+# BWT Water Softener Integration for Home Assistant
 
-**URL**: https://lovable.dev/projects/aa97bc83-f70c-4c32-be44-57f32c265795
+This integration allows you to monitor your BWT water softener in Home Assistant.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- Monitor water consumption
+- Track regeneration count
+- Get alerts for salt level and power outages
+- View device status (online, connected, last seen)
 
-**Use Lovable**
+## Installation
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/aa97bc83-f70c-4c32-be44-57f32c265795) and start prompting.
+### Manual Installation
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Copy the `custom_components/bwt` directory to your Home Assistant `custom_components` directory.
+2. Restart Home Assistant.
+3. Go to **Settings** > **Devices & Services** > **Add Integration** and search for "BWT Water Softener".
+4. Follow the configuration flow.
 
-**Use your preferred IDE**
+### HACS Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Add this repository as a custom repository in HACS.
+2. Search for "BWT Water Softener" in the HACS store and install it.
+3. Restart Home Assistant.
+4. Go to **Settings** > **Devices & Services** > **Add Integration** and search for "BWT Water Softener".
+5. Follow the configuration flow.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Configuration
 
-Follow these steps:
+During the setup, you'll need to provide:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- Your BWT username
+- Your BWT password
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Entities
 
-# Step 3: Install the necessary dependencies.
-npm i
+This integration adds the following entities:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+- **Sensor: BWT Water Consumption** - Current water consumption in liters
+- **Sensor: BWT Regeneration Count** - Number of regeneration cycles
+- **Binary Sensor: BWT Salt Alarm** - Indicates if salt level is low
+- **Binary Sensor: BWT Power Outage** - Indicates if a power outage has occurred
 
-**Edit a file directly in GitHub**
+## Credits
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/aa97bc83-f70c-4c32-be44-57f32c265795) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+This integration is based on the BWT API and is not affiliated with BWT.
