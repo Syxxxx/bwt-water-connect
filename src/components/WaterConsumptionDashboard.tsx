@@ -13,8 +13,15 @@ interface WaterConsumptionDashboardProps {
   onLogout: () => void;
 }
 
+interface Alert {
+  type: 'powerOutage' | 'saltAlarm';
+  message: string;
+  date: string;
+}
+
 const WaterConsumptionDashboard = ({ onLogout }: WaterConsumptionDashboardProps) => {
   const [consumptionData, setConsumptionData] = useState<WaterConsumptionData[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const { toast } = useToast();
@@ -24,6 +31,29 @@ const WaterConsumptionDashboard = ({ onLogout }: WaterConsumptionDashboardProps)
     try {
       const data = await BWTService.fetchWaterConsumptionData();
       setConsumptionData(data);
+      
+      // Extraire les alertes des données
+      const newAlerts: Alert[] = [];
+      
+      data.forEach(item => {
+        if (item.powerOutage) {
+          newAlerts.push({
+            type: 'powerOutage',
+            message: 'Coupure de courant détectée',
+            date: item.date
+          });
+        }
+        
+        if (item.saltAlarm) {
+          newAlerts.push({
+            type: 'saltAlarm',
+            message: 'Alarme sel active - vérifiez le niveau de sel',
+            date: item.date
+          });
+        }
+      });
+      
+      setAlerts(newAlerts);
       setLastUpdate(new Date());
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -58,14 +88,21 @@ const WaterConsumptionDashboard = ({ onLogout }: WaterConsumptionDashboardProps)
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), "dd/MM/yyyy", { locale: fr });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   const totalConsumption = consumptionData.reduce((sum, item) => sum + item.consumption, 0);
   const averageConsumption = consumptionData.length 
     ? Math.round(totalConsumption / consumptionData.length) 
     : 0;
   
   const regenCount = consumptionData.reduce((sum, item) => sum + item.regenCount, 0);
-  const hasPowerOutage = consumptionData.some(item => item.powerOutage);
-  const hasSaltAlarm = consumptionData.some(item => item.saltAlarm);
+  const hasAlerts = alerts.length > 0;
 
   const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
@@ -166,19 +203,21 @@ const WaterConsumptionDashboard = ({ onLogout }: WaterConsumptionDashboardProps)
         </Card>
       </div>
 
-      {(hasPowerOutage || hasSaltAlarm) && (
+      {hasAlerts && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-md">
           <div className="flex items-center gap-2 text-amber-700 mb-2">
             <AlertTriangle className="h-5 w-5" />
             <h3 className="font-medium">Alertes détectées</h3>
           </div>
           <ul className="space-y-1 pl-7 text-sm">
-            {hasPowerOutage && (
-              <li className="text-amber-600">Coupure de courant détectée</li>
-            )}
-            {hasSaltAlarm && (
-              <li className="text-red-600">Alarme sel active - vérifiez le niveau de sel</li>
-            )}
+            {alerts.map((alert, index) => (
+              <li 
+                key={index} 
+                className={`${alert.type === 'powerOutage' ? 'text-amber-600' : 'text-red-600'}`}
+              >
+                {alert.message} - <span className="font-medium">{formatDate(alert.date)}</span>
+              </li>
+            ))}
           </ul>
         </div>
       )}
