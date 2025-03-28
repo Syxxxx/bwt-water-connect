@@ -36,7 +36,7 @@ class BWTService {
   private isAuthenticated = false;
   private sessionCookie: string | null = null;
   private deviceReceiptLineKey: string | null = null;
-  private apiBaseUrl: string = "https://proxy-bwt.netlify.app";
+  private apiBaseUrl: string = "https://www.bwt-monservice.com";
 
   constructor() {
     // Check if credentials and session cookie are stored in localStorage
@@ -88,41 +88,40 @@ class BWTService {
 
   async login(credentials: BWTCredentials): Promise<boolean> {
     try {
-      const date = new Date().toISOString();
-      // Using a proxy server to avoid CORS issues
+      // Create form data for direct submission
+      const formData = new FormData();
+      formData.append('_username', credentials.username);
+      formData.append('_password', credentials.password);
+      
+      // Make direct request to BWT login endpoint
       const response = await fetch(`${this.apiBaseUrl}/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: credentials.username,
-          password: credentials.password,
-          date: date
-        })
+        body: formData,
+        redirect: 'follow',
+        credentials: 'include'
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Erreur d'authentification: ${response.status}`);
+        throw new Error(`Erreur d'authentification: ${response.status}`);
       }
-
-      const data = await response.json();
       
-      if (data.success) {
-        // Store session cookie from the response
-        if (data.cookie) {
-          this.setSessionCookie(data.cookie);
+      // Extract session cookie from response headers
+      const cookieHeader = response.headers.get('Set-Cookie');
+      if (cookieHeader) {
+        // Extract the session cookie value
+        const sessionCookie = this.extractSessionCookie(cookieHeader);
+        if (sessionCookie) {
+          this.setSessionCookie(sessionCookie);
         }
-        
-        // Set device key if available
-        if (data.deviceKey) {
-          this.setDeviceKey(data.deviceKey);
-        } else {
-          // If not provided, use a default or previously stored one
-          if (!this.deviceReceiptLineKey) {
-            this.setDeviceKey('00248808:1781377');
-          }
+      }
+      
+      // Check if we were redirected to the dashboard (successful login)
+      const isLoginSuccessful = response.url.includes('/mon-adoucisseur') || response.url.includes('/dashboard');
+      
+      if (isLoginSuccessful) {
+        // Set default device key if not already provided
+        if (!this.deviceReceiptLineKey) {
+          this.setDeviceKey('00248808:1781377');
         }
         
         this.setCredentials(credentials);
@@ -135,7 +134,7 @@ class BWTService {
         
         return true;
       } else {
-        throw new Error(data.message || "Échec d'authentification");
+        throw new Error("Échec d'authentification");
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -151,6 +150,17 @@ class BWTService {
     }
   }
 
+  // Helper function to extract session cookie from Set-Cookie header
+  private extractSessionCookie(cookieHeader: string): string | null {
+    const cookies = cookieHeader.split(';');
+    const sessionCookie = cookies.find(cookie => 
+      cookie.trim().startsWith('PHPSESSID=') || 
+      cookie.trim().startsWith('session=')
+    );
+    
+    return sessionCookie ? sessionCookie.trim() : null;
+  }
+
   async fetchWaterConsumptionData(): Promise<WaterConsumptionData[]> {
     if (!this.hasCredentials()) {
       throw new Error("Non authentifié");
@@ -162,23 +172,19 @@ class BWTService {
         throw new Error("Clé de dispositif non disponible");
       }
 
-      // Faire une requête en utilisant le proxy pour éviter les problèmes CORS
-      const url = `${this.apiBaseUrl}/device/ajaxChart`;
+      // Faire une requête directe à l'endpoint BWT
+      const url = `${this.apiBaseUrl}/device/ajaxChart?receiptLineKey=${this.deviceReceiptLineKey}`;
       
       const response = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
+          'Cookie': this.sessionCookie || '',
         },
-        body: JSON.stringify({
-          cookie: this.sessionCookie,
-          receiptLineKey: this.deviceReceiptLineKey
-        })
+        credentials: 'include'
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Erreur de récupération des données: ${response.status}`);
+        throw new Error(`Erreur de récupération des données: ${response.status}`);
       }
 
       const data = await response.json();
