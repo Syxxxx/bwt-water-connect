@@ -36,6 +36,7 @@ class BWTService {
   private isAuthenticated = false;
   private sessionCookie: string | null = null;
   private deviceReceiptLineKey: string | null = null;
+  private apiBaseUrl: string = "https://proxy-bwt.netlify.app";
 
   constructor() {
     // Check if credentials and session cookie are stored in localStorage
@@ -87,52 +88,65 @@ class BWTService {
 
   async login(credentials: BWTCredentials): Promise<boolean> {
     try {
-      // Authentification réelle à BWT
-      const response = await fetch('https://www.bwt-monservice.com/login', {
+      const date = new Date().toISOString();
+      // Using a proxy server to avoid CORS issues
+      const response = await fetch(`${this.apiBaseUrl}/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          'UserName': credentials.username,
-          'Password': credentials.password,
-          'RememberMe': 'true'
-        }),
-        credentials: 'include',
-        redirect: 'follow'
+        body: JSON.stringify({
+          username: credentials.username,
+          password: credentials.password,
+          date: date
+        })
       });
 
       if (!response.ok) {
-        throw new Error(`Erreur d'authentification: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Erreur d'authentification: ${response.status}`);
       }
 
-      // Récupérer le cookie de session depuis les en-têtes de réponse
-      const setCookieHeader = response.headers.get('set-cookie');
-      if (setCookieHeader) {
-        // Extraire le cookie de session (dans un environnement réel, nous utiliserions un proxy pour gérer les cookies)
-        const sessionCookie = setCookieHeader.split(';')[0];
-        this.setSessionCookie(sessionCookie);
+      const data = await response.json();
+      
+      if (data.success) {
+        // Store session cookie from the response
+        if (data.cookie) {
+          this.setSessionCookie(data.cookie);
+        }
+        
+        // Set device key if available
+        if (data.deviceKey) {
+          this.setDeviceKey(data.deviceKey);
+        } else {
+          // If not provided, use a default or previously stored one
+          if (!this.deviceReceiptLineKey) {
+            this.setDeviceKey('00248808:1781377');
+          }
+        }
+        
+        this.setCredentials(credentials);
+        
+        // Show success toast with date
+        toast({
+          title: "Connexion réussie",
+          description: `Vous êtes connecté à votre compte BWT. ${new Date().toLocaleString('fr-FR')}`,
+        });
+        
+        return true;
       } else {
-        // En mode développement/test, on peut simuler un cookie pour continuer
-        this.setSessionCookie('bwt_session=test_session');
+        throw new Error(data.message || "Échec d'authentification");
       }
-
-      // Après connexion, récupérer la clé du dispositif
-      // Dans un environnement réel, cela nécessiterait de parcourir la page d'accueil ou d'appeler une API
-      // Pour l'instant, on utilise une valeur par défaut ou stockée
-      if (!this.deviceReceiptLineKey) {
-        this.setDeviceKey('00248808:1781377'); // Clé d'exemple, à remplacer par la vraie clé obtenue
-      }
-
-      this.setCredentials(credentials);
-      return true;
     } catch (error) {
       console.error("Login error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      
       toast({
         title: "Erreur de connexion",
-        description: "Impossible de se connecter à BWT. Vérifiez vos identifiants.",
+        description: `${errorMessage} - ${new Date().toLocaleString('fr-FR')}`,
         variant: "destructive",
       });
+      
       return false;
     }
   }
@@ -148,33 +162,45 @@ class BWTService {
         throw new Error("Clé de dispositif non disponible");
       }
 
-      // Faire une requête réelle à l'API BWT
-      const url = `https://www.bwt-monservice.com/device/ajaxChart?receiptLineKey=${this.deviceReceiptLineKey}`;
+      // Faire une requête en utilisant le proxy pour éviter les problèmes CORS
+      const url = `${this.apiBaseUrl}/device/ajaxChart`;
       
       const response = await fetch(url, {
-        method: 'GET',
+        method: 'POST',
         headers: {
-          'Cookie': this.sessionCookie || '',
-          'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        body: JSON.stringify({
+          cookie: this.sessionCookie,
+          receiptLineKey: this.deviceReceiptLineKey
+        })
       });
 
       if (!response.ok) {
-        throw new Error(`Erreur de récupération des données: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Erreur de récupération des données: ${response.status}`);
       }
 
       const data = await response.json();
+      
+      // Afficher une notification avec la date
+      toast({
+        title: "Données récupérées",
+        description: `Données de consommation d'eau mises à jour - ${new Date().toLocaleString('fr-FR')}`,
+      });
       
       // Traiter les données pour correspondre à notre format
       return this.processDeviceData(data.dataset);
     } catch (error) {
       console.error("Error fetching water consumption data:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      
       toast({
         title: "Erreur de récupération des données",
-        description: "Impossible de récupérer les données de consommation d'eau.",
+        description: `${errorMessage} - ${new Date().toLocaleString('fr-FR')}`,
         variant: "destructive",
       });
+      
       throw error;
     }
   }
