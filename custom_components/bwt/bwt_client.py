@@ -19,7 +19,7 @@ class BWTClient:
         self.username = username
         self.password = password
         self.device_receipt_line_key = device_key
-        self.session_cookie = None
+        self.cookies = {}
         self.is_authenticated = False
         self._session = None
     
@@ -55,15 +55,16 @@ class BWTClient:
                     _LOGGER.error(f"Authentication error: {response.status}")
                     return False
                 
-                # Extract session cookie from response cookies
-                cookies = response.cookies
-                if 'PHPSESSID' in cookies:
-                    self.session_cookie = f"PHPSESSID={cookies['PHPSESSID'].value}"
+                # Capture all cookies from response
+                self.cookies = {key: cookie.value for key, cookie in response.cookies.items()}
+                
+                if self.cookies:
                     self.is_authenticated = True
                     _LOGGER.info(f"Successfully logged in to BWT at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    _LOGGER.debug(f"Captured cookies: {list(self.cookies.keys())}")
                     return True
                 else:
-                    _LOGGER.error("No session cookie found in response")
+                    _LOGGER.error("No cookies found in response")
                     return False
                 
         except Exception as e:
@@ -82,20 +83,17 @@ class BWTClient:
         try:
             session = await self._get_session()
             
-            # Make request to BWT device data endpoint
-            headers = {"Cookie": self.session_cookie} if self.session_cookie else {}
-            
+            # Make request to BWT device data endpoint with all stored cookies
             url = f"{API_BASE_URL}{API_DEVICE_DATA_URL}?receiptLineKey={self.device_receipt_line_key}"
             
-            async with session.get(url, headers=headers) as response:
+            async with session.get(url, cookies=self.cookies) as response:
                 if response.status != 200:
                     # Try to re-authenticate
                     _LOGGER.warning("Session expired, trying to re-authenticate")
                     await self.login()
                     
-                    # Retry the request
-                    headers = {"Cookie": self.session_cookie} if self.session_cookie else {}
-                    async with session.get(url, headers=headers) as retry_response:
+                    # Retry the request with fresh cookies
+                    async with session.get(url, cookies=self.cookies) as retry_response:
                         if retry_response.status != 200:
                             _LOGGER.error(f"Failed to fetch data: {retry_response.status}")
                             return {}
