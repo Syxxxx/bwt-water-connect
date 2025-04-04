@@ -22,7 +22,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import DOMAIN
+from .const import DOMAIN, VOLUME_CUBIC_METERS, CURRENCY_EURO
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,9 +31,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up BWT sensor based on a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    water_price = hass.data[DOMAIN][entry.entry_id]["water_price"]
     
     entities = [
         BWTWaterConsumptionSensor(coordinator, entry),
+        BWTWaterConsumptionCubicMeterSensor(coordinator, entry),
+        BWTWaterCostSensor(coordinator, entry, water_price),
         BWTRegenerationCountSensor(coordinator, entry),
         BWTSaltAlarmSensor(coordinator, entry),
         BWTPowerOutageSensor(coordinator, entry),
@@ -124,6 +127,69 @@ class BWTWaterConsumptionSensor(BWTBaseSensor):
             "online": data.get("online", False),
             "connected": data.get("connected", False),
             "last_seen": data.get("last_seen", ""),
+        }
+
+
+class BWTWaterConsumptionCubicMeterSensor(BWTBaseSensor):
+    """Sensor for water consumption in cubic meters."""
+    
+    def __init__(self, coordinator: DataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+        """Initialize the water consumption sensor in cubic meters."""
+        super().__init__(
+            coordinator=coordinator,
+            config_entry=config_entry,
+            name_suffix="Water Consumption Cubic Meters",
+            icon="mdi:water",
+            sensor_key="water_consumption",
+            device_class=SensorDeviceClass.WATER,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            unit_of_measurement=VOLUME_CUBIC_METERS,
+        )
+    
+    @property
+    def native_value(self) -> Any:
+        """Return the state of the sensor in cubic meters."""
+        if not self.available:
+            return None
+        
+        # Convert liters to cubic meters (1 cubic meter = 1000 liters)
+        water_consumption_liters = self.coordinator.data.get(self._sensor_key, 0)
+        return round(water_consumption_liters / 1000, 2)
+
+
+class BWTWaterCostSensor(BWTBaseSensor):
+    """Sensor for water cost."""
+    
+    def __init__(self, coordinator: DataUpdateCoordinator, config_entry: ConfigEntry, water_price: float) -> None:
+        """Initialize the water cost sensor."""
+        super().__init__(
+            coordinator=coordinator,
+            config_entry=config_entry,
+            name_suffix="Water Cost",
+            icon="mdi:currency-eur",
+            sensor_key="water_consumption",
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            unit_of_measurement=CURRENCY_EURO,
+        )
+        self._water_price = water_price
+    
+    @property
+    def native_value(self) -> Any:
+        """Return the water cost based on consumption and price per cubic meter."""
+        if not self.available:
+            return None
+        
+        # Calculate water cost (consumption in liters / 1000 * price per cubic meter)
+        water_consumption_liters = self.coordinator.data.get(self._sensor_key, 0)
+        water_consumption_cubic_meters = water_consumption_liters / 1000
+        return round(water_consumption_cubic_meters * self._water_price, 2)
+        
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional attributes."""
+        return {
+            "price_per_cubic_meter": self._water_price,
+            "last_updated": datetime.now().isoformat(),
         }
 
 

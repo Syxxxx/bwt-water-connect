@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_DEVICE_KEY, CONF_WATER_PRICE, DEFAULT_DEVICE_KEY, DEFAULT_WATER_PRICE
 from .bwt_client import BWTClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,6 +25,8 @@ CONFIG_SCHEMA = vol.Schema(
             {
                 vol.Required(CONF_USERNAME): cv.string,
                 vol.Required(CONF_PASSWORD): cv.string,
+                vol.Optional(CONF_DEVICE_KEY, default=DEFAULT_DEVICE_KEY): cv.string,
+                vol.Optional(CONF_WATER_PRICE, default=DEFAULT_WATER_PRICE): vol.Coerce(float),
             }
         )
     },
@@ -40,8 +42,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up BWT from a config entry."""
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
+    device_key = entry.data.get(CONF_DEVICE_KEY, DEFAULT_DEVICE_KEY)
+    water_price = entry.data.get(CONF_WATER_PRICE, DEFAULT_WATER_PRICE)
     
-    client = BWTClient(username, password)
+    client = BWTClient(username, password, device_key)
     
     # Create update coordinator
     coordinator = DataUpdateCoordinator(
@@ -58,6 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data[DOMAIN][entry.entry_id] = {
         "client": client,
         "coordinator": coordinator,
+        "water_price": water_price,
     }
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

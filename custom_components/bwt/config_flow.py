@@ -10,7 +10,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
 from .bwt_client import BWTClient
-from .const import DOMAIN
+from .const import DOMAIN, CONF_DEVICE_KEY, CONF_WATER_PRICE, DEFAULT_DEVICE_KEY, DEFAULT_WATER_PRICE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ class BWTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 client = BWTClient(
                     username=user_input[CONF_USERNAME],
                     password=user_input[CONF_PASSWORD],
+                    device_key=user_input.get(CONF_DEVICE_KEY, DEFAULT_DEVICE_KEY),
                 )
                 
                 # Test the credentials
@@ -49,12 +50,22 @@ class BWTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             finally:
                 await client.close()
                 
+        # Provide default values
+        user_input = user_input or {}
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_USERNAME): str,
                     vol.Required(CONF_PASSWORD): str,
+                    vol.Optional(
+                        CONF_DEVICE_KEY, 
+                        default=user_input.get(CONF_DEVICE_KEY, DEFAULT_DEVICE_KEY)
+                    ): str,
+                    vol.Optional(
+                        CONF_WATER_PRICE, 
+                        default=user_input.get(CONF_WATER_PRICE, DEFAULT_WATER_PRICE)
+                    ): vol.Coerce(float),
                 }
             ),
             errors=errors,
